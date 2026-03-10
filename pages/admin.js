@@ -11,7 +11,7 @@ export default function Admin() {
   const [applyDate, setApplyDate] = useState(new Date().toISOString().split('T')[0]);
 
   // MVP: 簡單密碼 (正式環境請改用 Auth)
-  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'touch123';
+  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'Big68952';
 
   // 1. 登入處理
   const handleLogin = (e) => {
@@ -67,7 +67,7 @@ export default function Admin() {
     try {
       const res = await fetch('/api/admin/update', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'x-api-key': process.env.NEXT_PUBLIC_API_SECRET_KEY || 'default-secret-key'
         },
@@ -77,7 +77,7 @@ export default function Admin() {
           applyDate,
         }),
       });
-      
+
       const json = await res.json();
       if (json.success) {
         alert('✅ 更新成功！');
@@ -95,7 +95,7 @@ export default function Admin() {
   // 5. 下載 CSV (含圖片連結)
   const handleDownloadCSV = () => {
     if (selectedIds.size === 0) return alert('請先勾選資料！');
-    
+
     const selectedData = data.filter(d => selectedIds.has(d.id));
     const csvContent = [
       ['團號', '姓名', '電話', 'LINE', '檔案連結', '用途', '申請日期'].join(','), // Header
@@ -121,9 +121,9 @@ export default function Admin() {
         <div style={styles.loginBox}>
           <h2>🔒 大鷹旅遊後台登入</h2>
           <form onSubmit={handleLogin}>
-            <input 
-              type="password" 
-              placeholder="請輸入管理員密碼" 
+            <input
+              type="password"
+              placeholder="請輸入管理員密碼"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={styles.input}
@@ -139,7 +139,7 @@ export default function Admin() {
   return (
     <div style={styles.adminContainer}>
       <Head><title>大鷹旅遊 - 證件管理後台</title></Head>
-      
+
       <header style={styles.header}>
         <h1>📋 證件上傳管理系統</h1>
         <button onClick={() => setIsLoggedIn(false)} style={styles.logoutBtn}>登出</button>
@@ -154,7 +154,7 @@ export default function Admin() {
         <div style={styles.actions}>
           <span>已選：{selectedIds.size} 筆</span>
           <button onClick={handleBatchUpdate} style={styles.actionBtn}>✍️ 批次更新用途</button>
-          <button onClick={handleDownloadCSV} style={{...styles.actionBtn, background: '#28a745'}}>⬇️ 下載清單</button>
+          <button onClick={handleDownloadCSV} style={{ ...styles.actionBtn, background: '#28a745' }}>⬇️ 下載清單</button>
           <button onClick={fetchData} style={styles.refreshBtn}>🔄 重新整理</button>
         </div>
       </div>
@@ -177,12 +177,12 @@ export default function Admin() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="9" style={{textAlign:'center', padding:'20px'}}>載入中...</td></tr>
+              <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>載入中...</td></tr>
             ) : data.length === 0 ? (
-              <tr><td colSpan="9" style={{textAlign:'center', padding:'20px'}}>目前無資料</td></tr>
+              <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>目前無資料</td></tr>
             ) : (
               data.map((row) => (
-                <tr key={row.id} style={{background: selectedIds.has(row.id) ? '#e6f7ff' : 'white'}}>
+                <tr key={row.id} style={{ background: selectedIds.has(row.id) ? '#e6f7ff' : 'white' }}>
                   <td><input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleSelect(row.id)} /></td>
                   <td>{row.status || '待處理'}</td>
                   <td>{row.groupId}</td>
@@ -211,11 +211,11 @@ const styles = {
   loginBox: { background: 'white', padding: '40px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center' },
   input: { padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '5px', width: '200px', marginBottom: '10px', display: 'block' },
   button: { padding: '10px 20px', background: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '16px', width: '100%' },
-  
+
   adminContainer: { padding: '20px', fontFamily: 'Arial, sans-serif', background: '#f9f9f9', minHeight: '100vh' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' },
   logoutBtn: { background: '#dc3545', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' },
-  
+
   toolbar: { display: 'flex', justifyContent: 'space-between', background: 'white', padding: '15px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
   filters: { display: 'flex', gap: '15px', alignItems: 'center' },
   smallInput: { padding: '5px', border: '1px solid #ddd', borderRadius: '4px' },

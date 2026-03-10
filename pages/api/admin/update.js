@@ -1,4 +1,4 @@
-import { openDb } from '../../../lib/db';
+import { updateRows } from '../../../lib/googleSheets';
 
 const API_SECRET_KEY = process.env.API_SECRET_KEY || 'default-secret-key';
 
@@ -14,26 +14,15 @@ export default async function handler(req, res) {
   if (!ids || ids.length === 0) return res.status(400).json({ error: 'Missing data' });
 
   try {
-    const db = await openDb();
+    const updates = ids.map(id => ({
+      // In the new Google Sheets implementation, `id` from frontend is actually the `_rowNumber`
+      // We need to ensure we pass it correctly to updateRows
+      rowNumber: parseInt(id, 10),
+      purpose,
+      applyDate
+    }));
 
-    // 使用 SQLite 交易 (Transaction) 確保多筆更新的一致性
-    await db.run('BEGIN TRANSACTION');
-
-    try {
-      const stmt = await db.prepare(
-        "UPDATE documents SET status = '已處理', purpose = ?, applyDate = ? WHERE id = ?"
-      );
-
-      for (const id of ids) {
-        await stmt.run([purpose, applyDate, id]);
-      }
-
-      await stmt.finalize();
-      await db.run('COMMIT');
-    } catch (err) {
-      await db.run('ROLLBACK');
-      throw err;
-    }
+    await updateRows(updates);
 
     res.status(200).json({ success: true, message: 'Updated successfully' });
   } catch (error) {

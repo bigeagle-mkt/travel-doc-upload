@@ -28,31 +28,21 @@ const API_SECRET_KEY = process.env.API_SECRET_KEY || 'default-secret-key';
 const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, 'https://developers.google.com/oauthplayground');
 oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
 
-import { openDb } from '../../lib/db';
+import { appendRow } from '../../lib/googleSheets';
 
-// 寫入 SQLite (Database)
+// 寫入 Google Sheets
 async function insertIntoDatabase(data) {
   try {
-    const db = await openDb();
-
-    await db.run(
-      `INSERT INTO documents (time, groupId, name, phone, lineUserId, fileLink, status, purpose, applyDate)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }), // time
-        data.groupId,    // groupId
-        data.name,       // name
-        data.phone,      // phone
-        data.lineUserId || '', // lineUserId
-        data.fileLink,   // fileLink
-        '待處理',        // status
-        '',              // purpose
-        ''               // applyDate
-      ]
-    );
-    console.log('✅ SQLite Database Update Success');
+    await appendRow({
+      groupId: data.groupId,
+      name: data.name,
+      phone: data.phone,
+      lineUserId: data.lineUserId,
+      fileLink: data.fileLink,
+    });
+    console.log('✅ Google Sheets Append Success');
   } catch (err) {
-    console.error('❌ SQLite Database Update Failed:', err);
+    console.error('❌ Google Sheets Append Failed:', err);
     // 不拋出錯誤，避免影響前端顯示成功
   }
 }

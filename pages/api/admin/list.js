@@ -1,4 +1,4 @@
-import { openDb } from '../../../lib/db';
+import { getRows } from '../../../lib/googleSheets';
 
 const API_SECRET_KEY = process.env.API_SECRET_KEY || 'default-secret-key';
 
@@ -11,22 +11,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const db = await openDb();
-
-    // 從 SQLite 讀取所有資料
-    const rows = await db.all('SELECT * FROM documents ORDER BY id DESC');
+    // 從 Google Sheets 讀取所有資料
+    const rows = await getRows();
 
     const data = rows.map((row) => ({
-      id: row.id,
-      time: row.time,
-      groupId: row.groupId,
-      name: row.name,
-      phone: row.phone,
-      lineUserId: row.lineUserId,
-      fileLink: row.fileLink,
-      status: row.status,
-      purpose: row.purpose,
-      applyDate: row.applyDate,
+      ...row,
+      id: row._rowNumber // Overwrite id to be the rowNumber for stable updates
     }));
 
     res.status(200).json({ success: true, data });

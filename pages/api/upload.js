@@ -214,10 +214,11 @@ export default async function handler(req, res) {
           throw new Error('Sharp processing failed: ' + sharpError.message);
         }
 
-        // 3. 診斷與上傳 (v1.0.5)
-        console.log('--- Request Diagnostic (v1.0.5) ---');
+        // 3. 診斷與上傳 (v1.0.6)
+        console.log('--- Request Diagnostic (v1.0.6) ---');
         console.log(`FILENAME: ${filename}`);
         console.log(`CLIENT_ID: len=${CLIENT_ID.length}, head=${CLIENT_ID.substring(0, 5)}...`);
+        console.log(`CLIENT_SECRET: len=${CLIENT_SECRET.length}, head=${CLIENT_SECRET.substring(0, 3)}, tail=${CLIENT_SECRET.substring(CLIENT_SECRET.length - 3)}`);
         console.log(`REFRESH_TOKEN: len=${REFRESH_TOKEN.length}`);
         console.log(`FOLDER_ID: ${FOLDER_ID}`);
         console.log(`SHEET_ID: ${SHEET_ID}`);

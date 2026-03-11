@@ -151,12 +151,18 @@ export default async function handler(req, res) {
 
   return new Promise((resolve, reject) => {
     form.parse(req, async (err, fields, files) => {
+      console.log('>>> [Step 1] Form parsing started');
       if (err) {
-        console.error('Upload Error:', err);
-        res.status(500).json({ error: 'File upload failed: ' + err.message });
+        console.error('❌ [Error] Formidable parse error:', err);
+        res.status(500).json({ 
+          error: 'Form parsing failed', 
+          message: err.message,
+          stack: err.stack 
+        });
         return resolve();
       }
 
+      console.log('>>> [Step 2] Form parsed successfully. Fields:', Object.keys(fields));
       const file = files.file?.[0];
       const name = fields.name?.[0] || 'Unknown';
       const phone = fields.phone?.[0] || 'NoPhone';
@@ -164,9 +170,11 @@ export default async function handler(req, res) {
       const lineUserId = fields.lineUserId?.[0] || null;
 
       if (!file) {
+        console.error('❌ [Error] No file found in request');
         res.status(400).json({ error: 'No file uploaded' });
         return resolve();
       }
+      console.log(`>>> [Step 3] File received: ${file.originalFilename}, Size: ${file.size}`);
 
       try {
         const originalPath = file.filepath;
@@ -174,31 +182,37 @@ export default async function handler(req, res) {
         const filename = `${groupId}_${name}_${phone}_${Date.now()}.jpg`;
 
         // 2. 影像處理優化 (In-Memory Buffer)
-        // 目標尺寸：寬度 1280px (兼顧清晰度與檔案大小)
+        console.log('>>> [Step 4] Starting Image Processing (Sharp)');
         const targetWidth = 1280;
 
         // 讀取原圖 metadata
         const metadata = await sharp(originalPath).metadata();
-        // 計算等比例高度
+        console.log(`>>> [Step 4.1] Original metadata: ${metadata.width}x${metadata.height}`);
+
         const targetHeight = Math.round((metadata.height / metadata.width) * targetWidth);
 
-        // 浮水印文字
         const today = new Date().toISOString().split('T')[0];
         const watermarkText = `僅供 XX 旅遊辦理簽證使用 ${today}`;
 
-        // 產生浮水印 SVG
         // 產生浮水印
+        console.log('>>> [Step 4.2] Creating Watermark SVG');
         const watermark = await createWatermark(targetWidth, targetHeight, watermarkText);
 
-        // 執行 Sharp 處理：Resize -> Watermark -> Buffer
-        const processedBuffer = await sharp(originalPath)
-          .resize({ width: targetWidth }) // 自動等比例縮放
-          .composite([{
-            input: watermark,
-            gravity: 'center',
-          }])
-          .jpeg({ quality: 80 }) // 80% 品質壓縮
-          .toBuffer();
+        // 執行 Sharp 處理
+        console.log('>>> [Step 4.3] Applying Watermark and Resizing');
+        let processedBuffer;
+        try {
+          processedBuffer = await sharp(originalPath)
+            .resize({ width: targetWidth }) // 自動等比例縮放
+            .composite([{
+              input: watermark,
+              gravity: 'center',
+            }])
+            .jpeg({ quality: 80 }) // 80% 品質壓縮
+            .toBuffer();
+        } catch (sharpError) {
+          throw new Error('Sharp processing failed: ' + sharpError.message);
+        }
 
         // 3. 診斷與上傳 (v1.0.5)
         console.log('--- Request Diagnostic (v1.0.5) ---');
@@ -210,8 +224,13 @@ export default async function handler(req, res) {
         console.log('--- End Request Diagnostic ---');
 
         console.log('正在上傳到 Google Drive...');
-        const driveFile = await uploadBufferToGoogleDrive(processedBuffer, filename, 'image/jpeg');
-        console.log('✅ Google Drive Upload Success:', driveFile.webViewLink);
+        let driveFile;
+        try {
+          driveFile = await uploadBufferToGoogleDrive(processedBuffer, filename, 'image/jpeg');
+          console.log('✅ Google Drive Upload Success:', driveFile.webViewLink);
+        } catch (driveError) {
+          throw new Error('Google Drive upload failed: ' + driveError.message);
+        }
 
         // 4. 更新資料庫 (SQLite)
         try {
@@ -257,13 +276,17 @@ export default async function handler(req, res) {
           }
         }
 
-        // 清除原始暫存檔 (只刪除 formidable 產生的那個)
+        // 清除原始暫存檔
         try {
-          if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath);
+          if (fs.existsSync(originalPath)) {
+            fs.unlinkSync(originalPath);
+            console.log('>>> [Step 8] Temporary file cleaned up');
+          }
         } catch (e) {
-          console.error('清除暫存檔失敗:', e);
+          console.error('⚠️ 清除暫存檔失敗:', e);
         }
 
+        console.log('>>> [Step 9] Request finished successfully');
         res.status(200).json({
           success: true,
           message: 'File uploaded successfully',
@@ -272,7 +295,7 @@ export default async function handler(req, res) {
         return resolve();
 
       } catch (error) {
-        console.error('❌ Final Processing Error:', error);
+        console.error('❌ [Crucial Error] Global Catch:', error);
         // 清理殘留檔案
         try {
           if (file && file.filepath && fs.existsSync(file.filepath)) {
@@ -282,11 +305,12 @@ export default async function handler(req, res) {
           console.error('清理失敗:', e);
         }
         
-        // 詳細回報錯誤給前端 (協助 Debug)
+        // 詳細回報錯誤給前端
         res.status(500).json({ 
           error: 'Internal Server Error',
           message: error.message,
-          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+          stack: error.stack, // 一律回傳 stack 協助 Debug (正式環境穩定後可移除)
+          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
         });
         return resolve();
       }

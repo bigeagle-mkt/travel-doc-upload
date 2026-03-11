@@ -202,7 +202,13 @@ export default function Home() {
         setMode('success');
         setMessage(t.uploadSuccess);
       } else {
-        setMessage(t.uploadFailed + (data.error || ''));
+        const errorMsg = data.error || 'Unknown Error';
+        const detailMsg = data.message ? ` [Detail: ${data.message}]` : '';
+        const stackMsg = data.stack ? `\n\nStack Trace:\n${data.stack}` : '';
+        const fullErrorMsg = data.fullError ? `\n\nFull Error JSON:\n${data.fullError}` : '';
+        
+        setMessage(t.uploadFailed + errorMsg + detailMsg + stackMsg + fullErrorMsg);
+        console.error('Detailed Error Response:', data);
       }
     } catch (err) {
       setMessage(t.error + err.message);

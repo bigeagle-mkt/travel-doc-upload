@@ -83,25 +83,35 @@ async function uploadBufferToGoogleDrive(buffer, fileName, mimeType) {
 // 浮水印設定
 const FONT_PATH = path.join(process.cwd(), 'public/fonts/Arial.ttf');
 
-// 產生浮水印 (使用 Sharp Text)
+// 產生浮水印 (使用 SVG 避免 Vercel Fontconfig 問題)
 async function createWatermark(width, height, text) {
+  // 計算字體大小 (約寬度的 5%)
   const fontSize = Math.max(24, Math.floor(width * 0.05));
+  
+  // 使用 SVG 文字，這在 Vercel 環境通常比 sharp({ text: ... }) 更穩定
+  const svgText = `
+    <svg width="${width}" height="${height}">
+      <style>
+        .watermark-text {
+          fill: white;
+          fill-opacity: 0.5;
+          font-size: ${fontSize}px;
+          font-family: sans-serif;
+          font-weight: bold;
+        }
+      </style>
+      <text 
+        x="50%" 
+        y="50%" 
+        text-anchor="middle" 
+        class="watermark-text"
+        transform="rotate(-30, ${width/2}, ${height/2})"
+      >
+        ${text}
+      </text>
+    </svg>`;
 
-  // 產生成文字圖片
-  const textImage = await sharp({
-    text: {
-      text: `<span foreground="white" alpha="50%">${text}</span>`,
-      font: 'Arial',
-      fontfile: FONT_PATH,
-      width: Math.floor(width * 0.8), // 限制寬度
-      rgba: true,
-    }
-  })
-    .rotate(-30, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
-
-  return textImage;
+  return Buffer.from(svgText);
 }
 
 export default async function handler(req, res) {
@@ -176,13 +186,13 @@ export default async function handler(req, res) {
           .jpeg({ quality: 80 }) // 80% 品質壓縮
           .toBuffer();
 
-        // 3. 診斷與上傳 (v1.0.4)
-        console.log('--- Request Diagnostic (v1.0.4) ---');
-        console.log(`CLIENT_ID: len=${CLIENT_ID.length}, head=${CLIENT_ID.substring(0, 5)}, tail=${CLIENT_ID.substring(CLIENT_ID.length - 5)}`);
-        console.log(`CLIENT_SECRET: len=${CLIENT_SECRET.length}, head=${CLIENT_SECRET.substring(0, 3)}, tail=${CLIENT_SECRET.substring(CLIENT_SECRET.length - 3)}`);
+        // 3. 診斷與上傳 (v1.0.5)
+        console.log('--- Request Diagnostic (v1.0.5) ---');
+        console.log(`FILENAME: ${filename}`);
+        console.log(`CLIENT_ID: len=${CLIENT_ID.length}, head=${CLIENT_ID.substring(0, 5)}...`);
         console.log(`REFRESH_TOKEN: len=${REFRESH_TOKEN.length}`);
-        console.log(`FONT_PATH: ${FONT_PATH}`);
-        console.log(`FONT_PATH EXISTS: ${fs.existsSync(FONT_PATH)}`);
+        console.log(`FOLDER_ID: ${FOLDER_ID}`);
+        console.log(`SHEET_ID: ${SHEET_ID}`);
         console.log('--- End Request Diagnostic ---');
 
         console.log('正在上傳到 Google Drive...');
@@ -248,10 +258,22 @@ export default async function handler(req, res) {
         return resolve();
 
       } catch (error) {
-        console.error('Processing Error:', error);
+        console.error('❌ Final Processing Error:', error);
         // 清理殘留檔案
-        if (file && fs.existsSync(file.filepath)) fs.unlinkSync(file.filepath);
-        res.status(500).json({ error: 'Internal Server Error: ' + error.message });
+        try {
+          if (file && file.filepath && fs.existsSync(file.filepath)) {
+            fs.unlinkSync(file.filepath);
+          }
+        } catch (e) {
+          console.error('清理失敗:', e);
+        }
+        
+        // 詳細回報錯誤給前端 (協助 Debug)
+        res.status(500).json({ 
+          error: 'Internal Server Error',
+          message: error.message,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
         return resolve();
       }
     });

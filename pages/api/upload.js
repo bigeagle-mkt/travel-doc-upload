@@ -115,8 +115,22 @@ async function createWatermark(width, height, text) {
 }
 
 export default async function handler(req, res) {
+  // CORS 預檢請求處理 (CORS Preflight)
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    console.warn(`⚠️ Received forbidden method: ${req.method} on /api/upload`);
+    // 在 Vercel 環境中有時 405 會被報成 500，這裡我們試著回傳 405 並加強 Log
+    return res.status(405).json({ 
+      error: 'Method Not Allowed', 
+      method: req.method,
+      expected: 'POST'
+    });
   }
 
   // 1. 簡易 API 驗證 (Header Check)

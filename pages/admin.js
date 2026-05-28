@@ -10,6 +10,11 @@ export default function Admin() {
   const [purpose, setPurpose] = useState('簽證申請');
   const [applyDate, setApplyDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // 新增：系統設定狀態
+  const [wmEnabled, setWmEnabled] = useState(true);
+  const [wmText, setWmText] = useState('僅供 XX 旅遊辦理簽證使用');
+  const [saveLoading, setSaveLoading] = useState(false);
+
   // MVP: 簡單密碼 (正式環境請改用 Auth)
   const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'Big68952';
 
@@ -19,6 +24,7 @@ export default function Admin() {
     if (password === ADMIN_PASSWORD) {
       setIsLoggedIn(true);
       fetchData();
+      fetchSettings(); // 登入後讀取設定
     } else {
       alert('❌ 密碼錯誤');
     }
@@ -43,6 +49,49 @@ export default function Admin() {
       alert('連線錯誤');
     }
     setLoading(false);
+  };
+
+  // 2.1 讀取系統設定
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/settings', {
+        headers: { 'x-api-key': process.env.NEXT_PUBLIC_API_SECRET_KEY || 'default-secret-key' }
+      });
+      const json = await res.json();
+      if (json.success) {
+        setWmEnabled(json.settings.watermark_enabled === 'true');
+        setWmText(json.settings.watermark_text);
+      }
+    } catch (err) {
+      console.error('Fetch settings error:', err);
+    }
+  };
+
+  // 2.2 儲存系統設定
+  const handleSaveSettings = async () => {
+    setSaveLoading(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.NEXT_PUBLIC_API_SECRET_KEY || 'default-secret-key'
+        },
+        body: JSON.stringify({
+          watermark_enabled: wmEnabled,
+          watermark_text: wmText
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert('✅ 設定儲存成功！');
+      } else {
+        alert('❌ 儲存失敗: ' + json.error);
+      }
+    } catch (err) {
+      alert('連線錯誤');
+    }
+    setSaveLoading(false);
   };
 
   // 3. 勾選邏輯
@@ -145,6 +194,37 @@ export default function Admin() {
         <button onClick={() => setIsLoggedIn(false)} style={styles.logoutBtn}>登出</button>
       </header>
 
+      {/* 系統設定區 */}
+      <div style={styles.settingsPanel}>
+        <h3>⚙️ 系統設定</h3>
+        <div style={styles.settingsRow}>
+          <label style={styles.label}>
+            <input 
+              type="checkbox" 
+              checked={wmEnabled} 
+              onChange={e => setWmEnabled(e.target.checked)} 
+            /> 啟用浮水印
+          </label>
+          <div style={styles.inputGroup}>
+            <span>浮水印文字：</span>
+            <input 
+              value={wmText} 
+              onChange={e => setWmText(e.target.value)} 
+              style={styles.longInput} 
+              placeholder="例如: 僅供 XX 旅遊辦理簽證使用"
+            />
+          </div>
+          <button 
+            onClick={handleSaveSettings} 
+            style={saveLoading ? styles.disabledBtn : styles.saveBtn}
+            disabled={saveLoading}
+          >
+            {saveLoading ? '儲存中...' : '💾 儲存設定'}
+          </button>
+        </div>
+        <p style={styles.note}>註：浮水印文字後方會自動加上「當前日期 (YYYY-MM-DD)」</p>
+      </div>
+
       {/* 操作區 */}
       <div style={styles.toolbar}>
         <div style={styles.filters}>
@@ -226,4 +306,14 @@ const styles = {
   tableWrapper: { background: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
   table: { width: '100%', borderCollapse: 'collapse' },
   link: { color: '#007bff', textDecoration: 'none' },
+
+  // 新增樣式
+  settingsPanel: { background: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
+  settingsRow: { display: 'flex', alignItems: 'center', gap: '20px', marginTop: '10px', flexWrap: 'wrap' },
+  label: { display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontWeight: 'bold' },
+  inputGroup: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1 },
+  longInput: { padding: '8px', border: '1px solid #ddd', borderRadius: '4px', flex: 1, minWidth: '200px' },
+  saveBtn: { padding: '8px 20px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' },
+  disabledBtn: { padding: '8px 20px', background: '#ccc', color: 'white', border: 'none', borderRadius: '5px', cursor: 'not-allowed' },
+  note: { fontSize: '12px', color: '#666', marginTop: '10px' },
 };

@@ -28,7 +28,7 @@ const API_SECRET_KEY = (process.env.API_SECRET_KEY || 'default-secret-key').trim
 const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, 'https://developers.google.com/oauthplayground');
 oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
 
-import { appendRow } from '../../lib/googleSheets';
+import { appendRow, getSettings } from '../../lib/googleSheets';
 
 // 寫入 Google Sheets
 async function insertIntoDatabase(data) {
@@ -191,23 +191,30 @@ export default async function handler(req, res) {
 
         const targetHeight = Math.round((metadata.height / metadata.width) * targetWidth);
 
+        // --- 新增：取得動態設定 ---
+        const settings = await getSettings();
+        const watermarkEnabled = settings.watermark_enabled === 'true';
         const today = new Date().toISOString().split('T')[0];
-        const watermarkText = `僅供 XX 旅遊辦理簽證使用 ${today}`;
-
-        // 產生浮水印
-        console.log('>>> [Step 4.2] Creating Watermark SVG');
-        const watermark = await createWatermark(targetWidth, targetHeight, watermarkText);
+        const watermarkText = `${settings.watermark_text} ${today}`;
 
         // 執行 Sharp 處理
         console.log('>>> [Step 4.3] Applying Watermark and Resizing');
         let processedBuffer;
         try {
-          processedBuffer = await sharp(originalPath)
-            .resize({ width: targetWidth }) // 自動等比例縮放
-            .composite([{
+          let sharpInstance = sharp(originalPath).resize({ width: targetWidth });
+
+          if (watermarkEnabled) {
+            console.log('>>> [Step 4.2] Creating Watermark SVG');
+            const watermark = await createWatermark(targetWidth, targetHeight, watermarkText);
+            sharpInstance = sharpInstance.composite([{
               input: watermark,
               gravity: 'center',
-            }])
+            }]);
+          } else {
+            console.log('>>> [Step 4.2] Watermark is DISABLED by settings');
+          }
+
+          processedBuffer = await sharpInstance
             .jpeg({ quality: 80 }) // 80% 品質壓縮
             .toBuffer();
         } catch (sharpError) {
